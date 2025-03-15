@@ -1,4 +1,5 @@
 import base64
+import math
 import random
 import secrets
 from collections import defaultdict
@@ -21,7 +22,7 @@ from config import (
     DISABLED_STATUS_TEXT,
     EXPIRED_STATUS_TEXT,
     LIMITED_STATUS_TEXT,
-    ONHOLD_STATUS_TEXT
+    ONHOLD_STATUS_TEXT,
 )
 
 SERVER_IP = get_public_ip()
@@ -198,30 +199,43 @@ def setup_format_variables(extra_data: dict) -> dict:
     if extra_data.get("data_limit"):
         data_limit = readable_size(extra_data["data_limit"])
         data_left = extra_data["data_limit"] - extra_data["used_traffic"]
+        usage_Percentage = round((extra_data["used_traffic"] / extra_data["data_limit"]) * 100.0, 2)
+
         if data_left < 0:
             data_left = 0
         data_left = readable_size(data_left)
     else:
         data_limit = "∞"
         data_left = "∞"
+        usage_Percentage = "∞"
 
     status_emoji = STATUS_EMOJIS.get(extra_data.get("status")) or ""
-    status_text = STATUS_TEXTS.get(extra_data.get("status")) or ""
+    status_template = STATUS_TEXTS.get(extra_data.get("status")) or ""
 
+    # Create a temporary dictionary with variables excluding STATUS_TEXT
+    temp_vars = {
+        "SERVER_IP": SERVER_IP,
+        "SERVER_IPV6": SERVER_IPV6,
+        "USERNAME": extra_data.get("username", "{USERNAME}"),
+        "DATA_USAGE": readable_size(extra_data.get("used_traffic")),
+        "DATA_LIMIT": data_limit,
+        "DATA_LEFT": data_left,
+        "DAYS_LEFT": days_left,
+        "EXPIRE_DATE": expire_date,
+        "JALALI_EXPIRE_DATE": jalali_expire_date,
+        "TIME_LEFT": time_left,
+        "STATUS_EMOJI": status_emoji,
+        "USAGE_PERCENTAGE": usage_Percentage,
+    }
+
+    # Format the status text using the temporary variables
+    status_text = status_template.format_map(defaultdict(lambda: "<missing>", temp_vars))
+
+    # Create the final format_variables including the formatted STATUS_TEXT
     format_variables = defaultdict(
         lambda: "<missing>",
         {
-            "SERVER_IP": SERVER_IP,
-            "SERVER_IPV6": SERVER_IPV6,
-            "USERNAME": extra_data.get("username", "{USERNAME}"),
-            "DATA_USAGE": readable_size(extra_data.get("used_traffic")),
-            "DATA_LIMIT": data_limit,
-            "DATA_LEFT": data_left,
-            "DAYS_LEFT": days_left,
-            "EXPIRE_DATE": expire_date,
-            "JALALI_EXPIRE_DATE": jalali_expire_date,
-            "TIME_LEFT": time_left,
-            "STATUS_EMOJI": status_emoji,
+            **temp_vars,
             "STATUS_TEXT": status_text,
         },
     )
@@ -272,6 +286,9 @@ def process_inbounds_and_tags(
                     salt = secrets.token_hex(8)
                     sni = random.choice(sni_list).replace("*", salt)
 
+                if sids := inbound.get("sids"):
+                    inbound["sid"] = random.choice(sids)
+
                 req_host = ""
                 req_host_list = host["host"] or inbound["host"]
                 if req_host_list:
@@ -288,6 +305,9 @@ def process_inbounds_and_tags(
                     path = host["path"].format_map(format_variables)
                 else:
                     path = inbound.get("path", "").format_map(format_variables)
+
+                if host.get("use_sni_as_host", False) and sni:
+                    req_host = sni
 
                 host_inbound.update(
                     {
@@ -311,7 +331,7 @@ def process_inbounds_and_tags(
                     remark=host["remark"].format_map(format_variables),
                     address=address.format_map(format_variables),
                     inbound=host_inbound,
-                    settings=settings.dict(no_obj=True)
+                    settings=settings.model_dump()
                 )
 
     return conf.render(reverse=reverse)

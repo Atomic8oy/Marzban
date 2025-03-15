@@ -69,7 +69,7 @@ import { DeleteIcon } from "./DeleteUserModal";
 import { Icon } from "./Icon";
 import { Input as CustomInput } from "./Input";
 
-export const DublicateIcon = chakra(DocumentDuplicateIcon, {
+export const DuplicateIcon = chakra(DocumentDuplicateIcon, {
   baseStyle: {
     w: 5,
     h: 5,
@@ -152,6 +152,7 @@ const hostsSchema = z.record(
       security: z.string(),
       alpn: z.string(),
       fingerprint: z.string(),
+      use_sni_as_host: z.boolean().default(false),
     })
   )
 );
@@ -212,6 +213,7 @@ const AccordionInbound: FC<AccordionInboundType> = ({
       security: "inbound_default",
       alpn: "",
       fingerprint: "",
+      use_sni_as_host: false,
     });
   };
   const duplicateHost = (index: number) => {
@@ -590,15 +592,15 @@ const AccordionInbound: FC<AccordionInboundType> = ({
                             </Tooltip>
                           </Container>
                         </AccordionButton>
-                        <Tooltip label="Dublicate" placement="top">
+                        <Tooltip label="Duplicate" placement="top">
                           <IconButton
-                            aria-label="Dublicate"
+                            aria-label="Duplicate"
                             size="sm"
                             colorScheme="white"
                             variant="ghost"
                             onClick={() => duplicateHost(index)}
                           >
-                            <DublicateIcon />
+                            <DuplicateIcon />
                           </IconButton>
                         </Tooltip>
                         {index < hosts.length - 1 && (
@@ -1067,6 +1069,33 @@ const AccordionInbound: FC<AccordionInboundType> = ({
 
 
                           <FormControl
+                            isInvalid={
+                              !!(
+                                accordionErrors &&
+                                accordionErrors[index]?.use_sni_as_host
+                              )
+                            }
+                          >
+                            <Checkbox
+                              {...form.register(
+                                hostKey + "." + index + ".use_sni_as_host"
+                              )}
+                            >
+                              <FormLabel>
+                                {t("hostsDialog.useSniAsHost")}
+                              </FormLabel>
+                            </Checkbox>
+                            {accordionErrors &&
+                              accordionErrors[index]?.use_sni_as_host && (
+                                <Error>
+                                  {
+                                    accordionErrors[index]?.use_sni_as_host
+                                      ?.message
+                                  }
+                                </Error>
+                              )}
+                        </FormControl>
+                         <FormControl
                             isInvalid={
                               !!(
                                 accordionErrors &&

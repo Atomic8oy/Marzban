@@ -5,28 +5,32 @@ from operator import attrgetter
 from typing import Union
 
 from pymysql.err import OperationalError
-from sqlalchemy import and_, bindparam, insert, select, sql, update
+from sqlalchemy import and_, bindparam, insert, select, update
+from sqlalchemy.orm import Session
+from sqlalchemy.sql.dml import Insert
 
 from app import scheduler, xray
 from app.db import GetDB
-from app.db.models import NodeUsage, NodeUserUsage, System, User
-from config import (DISABLE_RECORDING_NODE_USAGE,
-                    JOB_RECORD_NODE_USAGES_INTERVAL,
-                    JOB_RECORD_USER_USAGES_INTERVAL)
+from app.db.models import Admin, NodeUsage, NodeUserUsage, System, User
+from config import (
+    DISABLE_RECORDING_NODE_USAGE,
+    JOB_RECORD_NODE_USAGES_INTERVAL,
+    JOB_RECORD_USER_USAGES_INTERVAL,
+)
 from xray_api import XRay as XRayAPI
 from xray_api import exc as xray_exc
 
 
-def safe_execute(db, stmt, params=None):
+def safe_execute(db: Session, stmt, params=None):
     if db.bind.name == 'mysql':
-        if isinstance(stmt, sql.dml.Insert):
+        if isinstance(stmt, Insert):
             stmt = stmt.prefix_with('IGNORE')
 
         tries = 0
         done = False
         while not done:
             try:
-                db.execute(stmt, params)
+                db.connection().execute(stmt, params)
                 db.commit()
                 done = True
             except OperationalError as err:
@@ -37,7 +41,7 @@ def safe_execute(db, stmt, params=None):
                 raise err
 
     else:
-        db.execute(stmt, params)
+        db.connection().execute(stmt, params)
         db.commit()
 
 
@@ -140,10 +144,19 @@ def record_user_usages():
     for node_id, params in api_params.items():
         coefficient = usage_coefficient.get(node_id, 1)  # get the usage coefficient for the node
         for param in params:
-            users_usage[param['uid']] += param['value'] * coefficient  # apply the usage coefficient
+            users_usage[param['uid']] += int(param['value'] * coefficient)  # apply the usage coefficient
     users_usage = list({"uid": uid, "value": value} for uid, value in users_usage.items())
     if not users_usage:
         return
+
+    with GetDB() as db:
+        user_admin_map = dict(db.query(User.id, User.admin_id).all())
+
+    admin_usage = defaultdict(int)
+    for user_usage in users_usage:
+        admin_id = user_admin_map.get(int(user_usage["uid"]))
+        if admin_id:
+            admin_usage[admin_id] += user_usage["value"]
 
     # record users usage
     with GetDB() as db:
@@ -155,6 +168,13 @@ def record_user_usages():
         )
 
         safe_execute(db, stmt, users_usage)
+
+        admin_data = [{"admin_id": admin_id, "value": value} for admin_id, value in admin_usage.items()]
+        if admin_data:
+            admin_update_stmt = update(Admin). \
+                where(Admin.id == bindparam('admin_id')). \
+                values(users_usage=Admin.users_usage + bindparam('value'))
+            safe_execute(db, admin_update_stmt, admin_data)
 
     if DISABLE_RECORDING_NODE_USAGE:
         return
@@ -198,8 +218,8 @@ def record_node_usages():
 
 
 scheduler.add_job(record_user_usages, 'interval',
-                  seconds=JOB_RECORD_NODE_USAGES_INTERVAL,
+                  seconds=JOB_RECORD_USER_USAGES_INTERVAL,
                   coalesce=True, max_instances=1)
 scheduler.add_job(record_node_usages, 'interval',
-                  seconds=JOB_RECORD_USER_USAGES_INTERVAL,
+                  seconds=JOB_RECORD_NODE_USAGES_INTERVAL,
                   coalesce=True, max_instances=1)

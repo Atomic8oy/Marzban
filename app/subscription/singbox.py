@@ -2,6 +2,7 @@ import copy
 import json
 from random import choice
 
+from app.utils.helpers import UUIDEncoder
 from jinja2.exceptions import TemplateNotFound
 
 from app.subscription.funcs import get_grpc_gun
@@ -48,10 +49,10 @@ class SingBoxConfiguration(str):
         self.config["outbounds"].append(outbound_data)
 
     def render(self, reverse=False):
-        urltest_types = ["vmess", "vless", "trojan", "shadowsocks"]
+        urltest_types = ["vmess", "vless", "trojan", "shadowsocks", "hysteria2", "tuic", "http", "ssh"]
         urltest_tags = [outbound["tag"]
                         for outbound in self.config["outbounds"] if outbound["type"] in urltest_types]
-        selector_types = ["vmess", "vless", "trojan", "shadowsocks", "urltest"]
+        selector_types = ["vmess", "vless", "trojan", "shadowsocks", "hysteria2", "tuic", "http", "ssh", "urltest"]
         selector_tags = [outbound["tag"]
                          for outbound in self.config["outbounds"] if outbound["type"] in selector_types]
 
@@ -65,7 +66,7 @@ class SingBoxConfiguration(str):
 
         if reverse:
             self.config["outbounds"].reverse()
-        return json.dumps(self.config, indent=4)
+        return json.dumps(self.config, indent=4,cls=UUIDEncoder)
 
     @staticmethod
     def tls_config(sni=None, fp=None, tls=None, pbk=None,
@@ -243,6 +244,9 @@ class SingBoxConfiguration(str):
         if net == 'h2':
             net = 'http'
             alpn = 'h2'
+        elif net == 'h3':
+            net = 'http'
+            alpn = 'h3'
         elif net in ['tcp', 'raw'] and headers == 'http':
             net = 'http'
 
@@ -285,7 +289,7 @@ class SingBoxConfiguration(str):
         path = inbound["path"]
 
         # not supported by sing-box
-        if net in ("kcp", "splithttp") or (net == "quic" and inbound["header_type"] != "none"):
+        if net in ("kcp", "splithttp", "xhttp") or (net == "quic" and inbound["header_type"] != "none"):
             return
 
         if net in ("grpc", "gun"):

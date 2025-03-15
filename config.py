@@ -13,16 +13,19 @@ UVICORN_PORT = config("UVICORN_PORT", cast=int, default=8000)
 UVICORN_UDS = config("UVICORN_UDS", default=None)
 UVICORN_SSL_CERTFILE = config("UVICORN_SSL_CERTFILE", default=None)
 UVICORN_SSL_KEYFILE = config("UVICORN_SSL_KEYFILE", default=None)
-
+UVICORN_SSL_CA_TYPE = config("UVICORN_SSL_CA_TYPE", default="public").lower()
+DASHBOARD_PATH = config("DASHBOARD_PATH", default="/dashboard/")
 
 DEBUG = config("DEBUG", default=False, cast=bool)
 DOCS = config("DOCS", default=False, cast=bool)
 
 ALLOWED_ORIGINS = config("ALLOWED_ORIGINS", default="*").split(",")
 
-VITE_BASE_API = f"http://127.0.0.1:{UVICORN_PORT}/api/" \
-    if DEBUG and config("VITE_BASE_API", default="/api/") == "/api/" \
+VITE_BASE_API = (
+    f"{'https' if UVICORN_SSL_CERTFILE and UVICORN_SSL_KEYFILE else 'http'}://127.0.0.1:{UVICORN_PORT}/api/"
+    if DEBUG and config("VITE_BASE_API", default="/api/") == "/api/"
     else config("VITE_BASE_API", default="/api/")
+)
 
 XRAY_JSON = config("XRAY_JSON", default="./xray_config.json")
 XRAY_FALLBACKS_INBOUND_TAG = config("XRAY_FALLBACKS_INBOUND_TAG", cast=str, default="") or config(
@@ -42,6 +45,7 @@ TELEGRAM_ADMIN_ID = config(
 )
 TELEGRAM_PROXY_URL = config("TELEGRAM_PROXY_URL", default="")
 TELEGRAM_LOGGER_CHANNEL_ID = config("TELEGRAM_LOGGER_CHANNEL_ID", cast=int, default=0)
+TELEGRAM_LOGGER_TOPIC_ID = config("TELEGRAM_LOGGER_TOPIC_ID", cast=int, default=0)
 TELEGRAM_DEFAULT_VLESS_FLOW = config("TELEGRAM_DEFAULT_VLESS_FLOW", default="")
 
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = config("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", cast=int, default=1440)
@@ -65,12 +69,15 @@ USER_AGENT_TEMPLATE = config("USER_AGENT_TEMPLATE", default="user_agent/default.
 GRPC_USER_AGENT_TEMPLATE = config("GRPC_USER_AGENT_TEMPLATE", default="user_agent/grpc.json")
 
 EXTERNAL_CONFIG = config("EXTERNAL_CONFIG", default="", cast=str)
-LOGIN_NOTIFY_WHITE_LIST = [ip.strip() for ip in config("LOGIN_NOTIFY_WHITE_LIST", default="", cast=str).split(",") if ip.strip()]
+LOGIN_NOTIFY_WHITE_LIST = [ip.strip() for ip in config("LOGIN_NOTIFY_WHITE_LIST",
+                                                       default="", cast=str).split(",") if ip.strip()]
 
 USE_CUSTOM_JSON_DEFAULT = config("USE_CUSTOM_JSON_DEFAULT", default=False, cast=bool)
 USE_CUSTOM_JSON_FOR_V2RAYN = config("USE_CUSTOM_JSON_FOR_V2RAYN", default=False, cast=bool)
 USE_CUSTOM_JSON_FOR_V2RAYNG = config("USE_CUSTOM_JSON_FOR_V2RAYNG", default=False, cast=bool)
 USE_CUSTOM_JSON_FOR_STREISAND = config("USE_CUSTOM_JSON_FOR_STREISAND", default=False, cast=bool)
+USE_CUSTOM_JSON_FOR_HAPP = config("USE_CUSTOM_JSON_FOR_HAPP", default=False, cast=bool)
+USE_CUSTOM_JSON_FOR_NPVTUNNEL = config("USE_CUSTOM_JSON_FOR_NPVTUNNEL", default=False, cast=bool)
 
 NOTIFY_STATUS_CHANGE = config("NOTIFY_STATUS_CHANGE", default=True, cast=bool)
 NOTIFY_USER_CREATED = config("NOTIFY_USER_CREATED", default=True, cast=bool)
@@ -79,7 +86,7 @@ NOTIFY_USER_DELETED = config("NOTIFY_USER_DELETED", default=True, cast=bool)
 NOTIFY_USER_DATA_USED_RESET = config("NOTIFY_USER_DATA_USED_RESET", default=True, cast=bool)
 NOTIFY_USER_SUB_REVOKED = config("NOTIFY_USER_SUB_REVOKED", default=True, cast=bool)
 NOTIFY_IF_DATA_USAGE_PERCENT_REACHED = config("NOTIFY_IF_DATA_USAGE_PERCENT_REACHED", default=True, cast=bool)
-NOTIFY_IF_DAYS_LEF_REACHED = config("NOTIFY_IF_DAYS_LEF_REACHED", default=True, cast=bool)
+NOTIFY_IF_DAYS_LEFT_REACHED = config("NOTIFY_IF_DAYS_LEFT_REACHED", default=True, cast=bool)
 NOTIFY_LOGIN = config("NOTIFY_LOGIN", default=True, cast=bool)
 
 ACTIVE_STATUS_TEXT = config("ACTIVE_STATUS_TEXT", default="Active")
@@ -113,10 +120,18 @@ RECURRENT_NOTIFICATIONS_TIMEOUT = config("RECURRENT_NOTIFICATIONS_TIMEOUT", defa
 NUMBER_OF_RECURRENT_NOTIFICATIONS = config("NUMBER_OF_RECURRENT_NOTIFICATIONS", default=3, cast=int)
 
 # sends a notification when the user uses this much of thier data
-NOTIFY_REACHED_USAGE_PERCENT = config("NOTIFY_REACHED_USAGE_PERCENT", default=80, cast=int)
+NOTIFY_REACHED_USAGE_PERCENT = config(
+    "NOTIFY_REACHED_USAGE_PERCENT",
+    default="80",
+    cast=lambda v: [int(p.strip()) for p in v.split(',')] if v else []
+)
 
 # sends a notification when there is n days left of their service
-NOTIFY_DAYS_LEFT = config("NOTIFY_DAYS_LEFT", default=3, cast=int)
+NOTIFY_DAYS_LEFT = config(
+    "NOTIFY_DAYS_LEFT",
+    default="3",
+    cast=lambda v: [int(d.strip()) for d in v.split(',')] if v else []
+)
 
 DISABLE_RECORDING_NODE_USAGE = config("DISABLE_RECORDING_NODE_USAGE", cast=bool, default=False)
 

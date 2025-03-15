@@ -1,20 +1,35 @@
 import os
 from datetime import datetime
 
-from sqlalchemy import (JSON, BigInteger, Boolean, Column, DateTime, Enum,
-                        Float, ForeignKey, Integer, String, Table,
-                        UniqueConstraint, func)
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql.expression import text, select
+from sqlalchemy.sql.expression import select, text
 
 from app import xray
 from app.db.base import Base
 from app.models.node import NodeStatus
-from app.models.proxy import (ProxyHostALPN, ProxyHostFingerprint,
-                              ProxyHostSecurity, ProxyTypes)
-from app.models.user import (ReminderType, UserDataLimitResetStrategy,
-                             UserStatus)
+from app.models.proxy import (
+    ProxyHostALPN,
+    ProxyHostFingerprint,
+    ProxyHostSecurity,
+    ProxyTypes,
+)
+from app.models.user import ReminderType, UserDataLimitResetStrategy, UserStatus
 
 
 class Admin(Base):
@@ -29,6 +44,18 @@ class Admin(Base):
     password_reset_at = Column(DateTime, nullable=True)
     telegram_id = Column(BigInteger, nullable=True, default=None)
     discord_webhook = Column(String(1024), nullable=True, default=None)
+    users_usage = Column(BigInteger, nullable=False, default=0)
+    usage_logs = relationship("AdminUsageLogs", back_populates="admin")
+
+
+class AdminUsageLogs(Base):
+    __tablename__ = "admin_usage_logs"
+
+    id = Column(Integer, primary_key=True)
+    admin_id = Column(Integer, ForeignKey("admins.id"))
+    admin = relationship("Admin", back_populates="usage_logs")
+    used_traffic_at_reset = Column(BigInteger, nullable=False)
+    reset_at = Column(DateTime, default=datetime.utcnow)
 
 
 class User(Base):
@@ -68,21 +95,28 @@ class User(Base):
     edit_at = Column(DateTime, nullable=True, default=None)
     last_status_change = Column(DateTime, default=datetime.utcnow, nullable=True)
 
+    next_plan = relationship(
+        "NextPlan",
+        uselist=False,
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
     @hybrid_property
-    def reseted_usage(self):
-        return sum([log.used_traffic_at_reset for log in self.usage_logs])
+    def reseted_usage(self) -> int:
+        return int(sum([log.used_traffic_at_reset for log in self.usage_logs]))
 
     @reseted_usage.expression
-    def reseted_usage(self):
+    def reseted_usage(cls):
         return (
-            select([func.sum(UserUsageResetLogs.used_traffic_at_reset)]).
-            where(UserUsageResetLogs.user_id == self.id).
+            select(func.sum(UserUsageResetLogs.used_traffic_at_reset)).
+            where(UserUsageResetLogs.user_id == cls.id).
             label('reseted_usage')
         )
 
     @property
-    def lifetime_used_traffic(self):
-        return (
+    def lifetime_used_traffic(self) -> int:
+        return int(
             sum([log.used_traffic_at_reset for log in self.usage_logs])
             + self.used_traffic
         )
@@ -124,6 +158,19 @@ template_inbounds_association = Table(
     Column("user_template_id", ForeignKey("user_templates.id")),
     Column("inbound_tag", ForeignKey("inbounds.tag")),
 )
+
+
+class NextPlan(Base):
+    __tablename__ = 'next_plans'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    data_limit = Column(BigInteger, nullable=False)
+    expire = Column(Integer, nullable=True)
+    add_remaining_traffic = Column(Boolean, nullable=False, default=False, server_default='0')
+    fire_on_either = Column(Boolean, nullable=False, default=True, server_default='0')
+
+    user = relationship("User", back_populates="next_plan")
 
 
 class UserTemplate(Base):
@@ -185,8 +232,8 @@ class ProxyHost(Base):
     address = Column(String(256), unique=False, nullable=False)
     port = Column(Integer, nullable=True)
     path = Column(String(256), unique=False, nullable=True)
-    sni = Column(String(256), unique=False, nullable=True)
-    host = Column(String(256), unique=False, nullable=True)
+    sni = Column(String(1000), unique=False, nullable=True)
+    host = Column(String(1000), unique=False, nullable=True)
     security = Column(
         Enum(ProxyHostSecurity),
         unique=False,
@@ -216,6 +263,7 @@ class ProxyHost(Base):
     fragment_setting = Column(String(100), nullable=True)
     noise_setting = Column(String(2000), nullable=True)
     random_user_agent = Column(Boolean, nullable=False, default=False, server_default='0')
+    use_sni_as_host = Column(Boolean, nullable=False, default=False, server_default="0")
 
 
 class System(Base):
@@ -299,5 +347,6 @@ class NotificationReminder(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("User", back_populates="notification_reminders")
     type = Column(Enum(ReminderType), nullable=False)
+    threshold = Column(Integer, nullable=True)
     expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

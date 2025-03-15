@@ -11,13 +11,14 @@ from jinja2.exceptions import TemplateNotFound
 
 from app.subscription.funcs import get_grpc_gun, get_grpc_multi
 from app.templates import render_template
+from app.utils.helpers import UUIDEncoder
 from config import (
     EXTERNAL_CONFIG,
     GRPC_USER_AGENT_TEMPLATE,
     MUX_TEMPLATE,
     USER_AGENT_TEMPLATE,
     V2RAY_SETTINGS_TEMPLATE,
-    V2RAY_SUBSCRIPTION_TEMPLATE
+    V2RAY_SUBSCRIPTION_TEMPLATE,
 )
 
 
@@ -71,10 +72,17 @@ class V2rayShareLink(str):
                 ais=inbound.get("ais", ""),
                 fs=inbound.get("fragment_setting", ""),
                 multiMode=multi_mode,
-                sc_max_each_post_bytes=inbound.get('scMaxEachPostBytes', 1000000),
-                sc_max_concurrent_posts=inbound.get('scMaxConcurrentPosts', 100),
-                sc_min_posts_interval_ms=inbound.get('scMinPostsIntervalMs', 30),
-                x_padding_bytes=inbound.get("xPaddingBytes", "100-1000"),
+                sc_max_each_post_bytes=inbound.get('scMaxEachPostBytes'),
+                sc_max_concurrent_posts=inbound.get('scMaxConcurrentPosts'),
+                sc_min_posts_interval_ms=inbound.get('scMinPostsIntervalMs'),
+                x_padding_bytes=inbound.get("xPaddingBytes"),
+                mode=inbound.get("mode", ""),
+                noGRPCHeader=inbound.get("noGRPCHeader"),
+                heartbeatPeriod=inbound.get("heartbeatPeriod", 0),
+                keepAlivePeriod=inbound.get("keepAlivePeriod", 0),
+                scStreamUpServerSecs=inbound.get("scStreamUpServerSecs"),
+                xmux=inbound.get("xmux", {}),
+                downloadSettings=inbound.get("downloadSettings", {})
             )
 
         elif inbound["protocol"] == "vless":
@@ -98,10 +106,17 @@ class V2rayShareLink(str):
                 ais=inbound.get("ais", ""),
                 fs=inbound.get("fragment_setting", ""),
                 multiMode=multi_mode,
-                sc_max_each_post_bytes=inbound.get('scMaxEachPostBytes', 1000000),
-                sc_max_concurrent_posts=inbound.get('scMaxConcurrentPosts', 100),
-                sc_min_posts_interval_ms=inbound.get('scMinPostsIntervalMs', 30),
-                x_padding_bytes=inbound.get("xPaddingBytes", "100-1000"),
+                sc_max_each_post_bytes=inbound.get('scMaxEachPostBytes'),
+                sc_max_concurrent_posts=inbound.get('scMaxConcurrentPosts'),
+                sc_min_posts_interval_ms=inbound.get('scMinPostsIntervalMs'),
+                x_padding_bytes=inbound.get("xPaddingBytes"),
+                mode=inbound.get("mode", ""),
+                noGRPCHeader=inbound.get("noGRPCHeader"),
+                heartbeatPeriod=inbound.get("heartbeatPeriod", 0),
+                keepAlivePeriod=inbound.get("keepAlivePeriod", 0),
+                scStreamUpServerSecs=inbound.get("scStreamUpServerSecs"),
+                xmux=inbound.get("xmux", {}),
+                downloadSettings=inbound.get("downloadSettings", {})
             )
 
         elif inbound["protocol"] == "trojan":
@@ -125,10 +140,17 @@ class V2rayShareLink(str):
                 ais=inbound.get("ais", ""),
                 fs=inbound.get("fragment_setting", ""),
                 multiMode=multi_mode,
-                sc_max_each_post_bytes=inbound.get('scMaxEachPostBytes', 1000000),
-                sc_max_concurrent_posts=inbound.get('scMaxConcurrentPosts', 100),
-                sc_min_posts_interval_ms=inbound.get('scMinPostsIntervalMs', 30),
-                x_padding_bytes=inbound.get("xPaddingBytes", "100-1000"),
+                sc_max_each_post_bytes=inbound.get('scMaxEachPostBytes'),
+                sc_max_concurrent_posts=inbound.get('scMaxConcurrentPosts'),
+                sc_min_posts_interval_ms=inbound.get('scMinPostsIntervalMs'),
+                x_padding_bytes=inbound.get("xPaddingBytes"),
+                mode=inbound.get("mode", ""),
+                noGRPCHeader=inbound.get("noGRPCHeader"),
+                heartbeatPeriod=inbound.get("heartbeatPeriod", 0),
+                keepAlivePeriod=inbound.get("keepAlivePeriod", 0),
+                xmux=inbound.get("xmux", {}),
+                scStreamUpServerSecs=inbound.get("scStreamUpServerSecs"),
+                downloadSettings=inbound.get("downloadSettings", {})
             )
 
         elif inbound["protocol"] == "shadowsocks":
@@ -165,10 +187,17 @@ class V2rayShareLink(str):
             ais="",
             fs="",
             multiMode: bool = False,
-            sc_max_each_post_bytes: int = 1000000,
-            sc_max_concurrent_posts: int = 100,
-            sc_min_posts_interval_ms: int = 30,
-            x_padding_bytes: str = "100-1000",
+            sc_max_each_post_bytes: int | None = None,
+            sc_max_concurrent_posts: int | None = None,
+            sc_min_posts_interval_ms: int | None = None,
+            x_padding_bytes: str | None = None,
+            mode: str = "",
+            noGRPCHeader: bool | None = None,
+            heartbeatPeriod: int | None = None,
+            scStreamUpServerSecs: int | None = None,
+            keepAlivePeriod: int = 0,
+            xmux: dict = {},
+            downloadSettings: dict = {},
     ):
         payload = {
             "add": address,
@@ -212,21 +241,39 @@ class V2rayShareLink(str):
             else:
                 payload["mode"] = "gun"
 
-        elif net == "splithttp":
-            # before 1.8.23
-            payload["maxUploadSize"] = sc_max_each_post_bytes
-            payload["maxConcurrentUploads"] = sc_max_concurrent_posts
-            # 1.8.23 and later
-            payload["scMaxEachPostBytes"] = sc_max_each_post_bytes
-            payload["scMaxConcurrentPosts"] = sc_max_concurrent_posts
-            payload["scMinPostsIntervalMs"] = sc_min_posts_interval_ms
-            payload["xPaddingBytes"] = x_padding_bytes
+        elif net in ("splithttp", "xhttp"):
+            extra = {}
+            if sc_max_each_post_bytes is not None:
+                extra["scMaxEachPostBytes"] = sc_max_each_post_bytes
+            if sc_max_concurrent_posts is not None:
+                extra["scMaxConcurrentPosts"] = sc_max_concurrent_posts
+            if sc_min_posts_interval_ms is not None:
+                extra["scMinPostsIntervalMs"] = sc_min_posts_interval_ms
+            if x_padding_bytes is not None:
+                extra["xPaddingBytes"] = x_padding_bytes
+            if noGRPCHeader is not None:
+                extra["noGRPCHeader"] = noGRPCHeader
+            if scStreamUpServerSecs is not None:
+                extra["scStreamUpServerSecs"] = scStreamUpServerSecs
+            if keepAlivePeriod > 0:
+                extra["keepAlivePeriod"] = keepAlivePeriod
+            if xmux:
+                extra["xmux"] = xmux
+            if downloadSettings:
+                extra["downloadSettings"] = downloadSettings
+            payload["type"] = mode
+            if extra:
+                payload["extra"] = (json.dumps(extra)).replace(" ", "")
+
+        elif net == "ws":
+            if heartbeatPeriod:
+                payload["heartbeatPeriod"] = heartbeatPeriod
 
         return (
-                "vmess://"
-                + base64.b64encode(
-            json.dumps(payload, sort_keys=True).encode("utf-8")
-        ).decode()
+            "vmess://"
+            + base64.b64encode(
+                json.dumps(payload, sort_keys=True).encode("utf-8")
+            ).decode()
         )
 
     @classmethod
@@ -250,10 +297,17 @@ class V2rayShareLink(str):
               ais='',
               fs="",
               multiMode: bool = False,
-              sc_max_each_post_bytes: int = 1000000,
-              sc_max_concurrent_posts: int = 100,
-              sc_min_posts_interval_ms: int = 30,
-              x_padding_bytes: str = "100-1000",
+              sc_max_each_post_bytes: int | None = None,
+              sc_max_concurrent_posts: int | None = None,
+              sc_min_posts_interval_ms: int | None = None,
+              x_padding_bytes: str | None = None,
+              mode: str = "",
+              noGRPCHeader: bool | None = None,
+              heartbeatPeriod: int | None = None,
+              scStreamUpServerSecs: int | None = None,
+              keepAlivePeriod: int = 0,
+              xmux: dict = {},
+              downloadSettings: dict = {},
               ):
 
         payload = {
@@ -276,21 +330,41 @@ class V2rayShareLink(str):
             payload['key'] = path
             payload["quicSecurity"] = host
 
-        elif net == "splithttp":
+        elif net in ("splithttp", "xhttp"):
             payload["path"] = path
             payload["host"] = host
-            # before 1.8.23
-            payload["maxUploadSize"] = sc_max_each_post_bytes
-            payload["maxConcurrentUploads"] = sc_max_concurrent_posts
-            # 1.8.23 and later
-            payload["scMaxEachPostBytes"] = sc_max_each_post_bytes
-            payload["scMaxConcurrentPosts"] = sc_max_concurrent_posts
-            payload["scMinPostsIntervalMs"] = sc_min_posts_interval_ms
-            payload["xPaddingBytes"] = x_padding_bytes
+            payload["mode"] = mode
+            extra = {}
+            if sc_max_each_post_bytes is not None:
+                extra["scMaxEachPostBytes"] = sc_max_each_post_bytes
+            if sc_max_concurrent_posts is not None:
+                extra["scMaxConcurrentPosts"] = sc_max_concurrent_posts
+            if sc_min_posts_interval_ms is not None:
+                extra["scMinPostsIntervalMs"] = sc_min_posts_interval_ms
+            if x_padding_bytes is not None:
+                extra["xPaddingBytes"] = x_padding_bytes
+            if noGRPCHeader is not None:
+                extra["noGRPCHeader"] = noGRPCHeader
+            if scStreamUpServerSecs is not None:
+                extra["scStreamUpServerSecs"] = scStreamUpServerSecs
+            if keepAlivePeriod > 0:
+                extra["keepAlivePeriod"] = keepAlivePeriod
+            if xmux:
+                extra["xmux"] = xmux
+            if downloadSettings:
+                extra["downloadSettings"] = downloadSettings
+            if extra:
+                payload["extra"] = (json.dumps(extra)).replace(" ", "")
 
         elif net == 'kcp':
             payload['seed'] = path
             payload["host"] = host
+
+        elif net == "ws":
+            payload["path"] = path
+            payload["host"] = host
+            if heartbeatPeriod:
+                payload["heartbeatPeriod"] = heartbeatPeriod
 
         else:
             payload["path"] = path
@@ -315,10 +389,10 @@ class V2rayShareLink(str):
                 payload["spx"] = spx
 
         return (
-                "vless://"
-                + f"{id}@{address}:{port}?"
-                + urlparse.urlencode(payload)
-                + f"#{(urlparse.quote(remark))}"
+            "vless://"
+            + f"{id}@{address}:{port}?"
+            + urlparse.urlencode(payload)
+            + f"#{(urlparse.quote(remark))}"
         )
 
     @classmethod
@@ -342,10 +416,17 @@ class V2rayShareLink(str):
                ais='',
                fs="",
                multiMode: bool = False,
-               sc_max_each_post_bytes: int = 1000000,
-               sc_max_concurrent_posts: int = 100,
-               sc_min_posts_interval_ms: int = 30,
-               x_padding_bytes: str = "100-1000",
+               sc_max_each_post_bytes: int | None = None,
+               sc_max_concurrent_posts: int | None = None,
+               sc_min_posts_interval_ms: int | None = None,
+               x_padding_bytes: str | None = None,
+               mode: str = "",
+               noGRPCHeader: bool | None = None,
+               heartbeatPeriod: int | None = None,
+               scStreamUpServerSecs: int | None = None,
+               keepAlivePeriod: int = 0,
+               xmux: dict = {},
+               downloadSettings: dict = {},
                ):
 
         payload = {
@@ -364,17 +445,31 @@ class V2rayShareLink(str):
             else:
                 payload["mode"] = "gun"
 
-        elif net == "splithttp":
+        elif net in ("splithttp", "xhttp"):
             payload["path"] = path
             payload["host"] = host
-            # before 1.8.23
-            payload["maxUploadSize"] = sc_max_each_post_bytes
-            payload["maxConcurrentUploads"] = sc_max_concurrent_posts
-            # 1.8.23 and later
-            payload["scMaxEachPostBytes"] = sc_max_each_post_bytes
-            payload["scMaxConcurrentPosts"] = sc_max_concurrent_posts
-            payload["scMinPostsIntervalMs"] = sc_min_posts_interval_ms
-            payload["xPaddingBytes"] = x_padding_bytes
+            payload["mode"] = mode
+            extra = {}
+            if sc_max_each_post_bytes is not None:
+                extra["scMaxEachPostBytes"] = sc_max_each_post_bytes
+            if sc_max_concurrent_posts is not None:
+                extra["scMaxConcurrentPosts"] = sc_max_concurrent_posts
+            if sc_min_posts_interval_ms is not None:
+                extra["scMinPostsIntervalMs"] = sc_min_posts_interval_ms
+            if x_padding_bytes is not None:
+                extra["xPaddingBytes"] = x_padding_bytes
+            if noGRPCHeader is not None:
+                extra["noGRPCHeader"] = noGRPCHeader
+            if keepAlivePeriod > 0:
+                extra["keepAlivePeriod"] = keepAlivePeriod
+            if scStreamUpServerSecs is not None:
+                extra["scStreamUpServerSecs"] = scStreamUpServerSecs
+            if xmux:
+                extra["xmux"] = xmux
+            if downloadSettings:
+                extra["downloadSettings"] = downloadSettings
+            if extra:
+                payload["extra"] = (json.dumps(extra)).replace(" ", "")
 
         elif net == 'quic':
             payload['key'] = path
@@ -383,6 +478,12 @@ class V2rayShareLink(str):
         elif net == 'kcp':
             payload['seed'] = path
             payload["host"] = host
+
+        elif net == "ws":
+            payload["path"] = path
+            payload["host"] = host
+            if heartbeatPeriod:
+                payload["heartbeatPeriod"] = heartbeatPeriod
 
         else:
             payload["path"] = path
@@ -406,10 +507,10 @@ class V2rayShareLink(str):
                 payload["spx"] = spx
 
         return (
-                "trojan://"
-                + f"{urlparse.quote(password, safe=':')}@{address}:{port}?"
-                + urlparse.urlencode(payload)
-                + f"#{urlparse.quote(remark)}"
+            "trojan://"
+            + f"{urlparse.quote(password, safe=':')}@{address}:{port}?"
+            + urlparse.urlencode(payload)
+            + f"#{urlparse.quote(remark)}"
         )
 
     @classmethod
@@ -417,9 +518,9 @@ class V2rayShareLink(str):
             cls, remark: str, address: str, port: int, password: str, method: str
     ):
         return (
-                "ss://"
-                + base64.b64encode(f"{method}:{password}".encode()).decode()
-                + f"@{address}:{port}#{urlparse.quote(remark)}"
+            "ss://"
+            + base64.b64encode(f"{method}:{password}".encode()).decode()
+            + f"@{address}:{port}#{urlparse.quote(remark)}"
         )
 
 
@@ -436,7 +537,8 @@ class V2rayJsonConfig(str):
         else:
             self.user_agent_list = []
 
-        grpc_user_agent_data = json.loads(render_template(GRPC_USER_AGENT_TEMPLATE))
+        grpc_user_agent_data = json.loads(
+            render_template(GRPC_USER_AGENT_TEMPLATE))
 
         if 'list' in grpc_user_agent_data and isinstance(grpc_user_agent_data['list'], list):
             self.grpc_user_agent_data = grpc_user_agent_data['list']
@@ -444,7 +546,8 @@ class V2rayJsonConfig(str):
             self.grpc_user_agent_data = []
 
         try:
-            self.settings = json.loads(render_template(V2RAY_SETTINGS_TEMPLATE))
+            self.settings = json.loads(
+                render_template(V2RAY_SETTINGS_TEMPLATE))
         except TemplateNotFound:
             self.settings = {}
 
@@ -459,7 +562,7 @@ class V2rayJsonConfig(str):
     def render(self, reverse=False):
         if reverse:
             self.config.reverse()
-        return json.dumps(self.config, indent=4)
+        return json.dumps(self.config, indent=4, cls=UUIDEncoder)
 
     @staticmethod
     def tls_config(sni=None, fp=None, alpn=None, ais: bool = False) -> dict:
@@ -500,7 +603,7 @@ class V2rayJsonConfig(str):
 
         return realitySettings
 
-    def ws_config(self, path: str = "", host: str = "", random_user_agent: bool = False) -> dict:
+    def ws_config(self, path: str = "", host: str = "", random_user_agent: bool = False, heartbeatPeriod: int = 0) -> dict:
         wsSettings = copy.deepcopy(self.settings.get("wsSettings", {}))
 
         if "headers" not in wsSettings:
@@ -508,14 +611,17 @@ class V2rayJsonConfig(str):
         if path:
             wsSettings["path"] = path
         if host:
-            wsSettings["headers"]["Host"] = host
+            wsSettings["host"] = host
         if random_user_agent:
             wsSettings["headers"]["User-Agent"] = choice(self.user_agent_list)
+        if heartbeatPeriod:
+            wsSettings["heartbeatPeriod"] = heartbeatPeriod
 
         return wsSettings
 
     def httpupgrade_config(self, path: str = "", host: str = "", random_user_agent: bool = False) -> dict:
-        httpupgradeSettings = copy.deepcopy(self.settings.get("httpupgradeSettings", {}))
+        httpupgradeSettings = copy.deepcopy(
+            self.settings.get("httpupgradeSettings", {}))
 
         if "headers" not in httpupgradeSettings:
             httpupgradeSettings["headers"] = {}
@@ -530,32 +636,47 @@ class V2rayJsonConfig(str):
         return httpupgradeSettings
 
     def splithttp_config(self, path: str = "", host: str = "", random_user_agent: bool = False,
-                         sc_max_each_post_bytes: int = 1000000,
-                         sc_max_concurrent_posts: int = 100,
-                         sc_min_posts_interval_ms: int = 30,
-                         x_padding_bytes: str = "100-1000",
+                         sc_max_each_post_bytes: int | None = None,
+                         sc_max_concurrent_posts: int | None = None,
+                         sc_min_posts_interval_ms: int | None = None,
+                         x_padding_bytes: str | None = None,
                          xmux: dict = {},
+                         downloadSettings: dict = {},
+                         mode: str = "",
+                         noGRPCHeader: bool | None = None,
+                         scStreamUpServerSecs: int | None = None,
+                         keepAlivePeriod: int = 0,
                          ) -> dict:
         config = copy.deepcopy(self.settings.get("splithttpSettings", {}))
 
+        config["mode"] = mode
         if path:
             config["path"] = path
         if host:
             config["host"] = host
         if random_user_agent:
-            config["headers"]["User-Agent"] = choice(
-                self.user_agent_list)
-        # before 1.8.23
-        config["maxUploadSize"] = sc_max_each_post_bytes
-        config["maxConcurrentUploads"] = sc_max_concurrent_posts
-        # 1.8.23 and later
-        config["scMaxEachPostBytes"] = sc_max_each_post_bytes
-        config["scMaxConcurrentPosts"] = sc_max_concurrent_posts
-        config["scMinPostsIntervalMs"] = sc_min_posts_interval_ms
-        config["xPaddingBytes"] = x_padding_bytes
+            config["headers"]["User-Agent"] = choice(self.user_agent_list)
+        extra = {}
+        if sc_max_each_post_bytes is not None:
+            extra["scMaxEachPostBytes"] = sc_max_each_post_bytes
+        if sc_max_concurrent_posts is not None:
+            extra["scMaxConcurrentPosts"] = sc_max_concurrent_posts
+        if sc_min_posts_interval_ms is not None:
+            extra["scMinPostsIntervalMs"] = sc_min_posts_interval_ms
+        if x_padding_bytes is not None:
+            extra["xPaddingBytes"] = x_padding_bytes
+        if noGRPCHeader is not None:
+            extra["noGRPCHeader"] = noGRPCHeader
+        if scStreamUpServerSecs is not None:
+            extra["scStreamUpServerSecs"] = scStreamUpServerSecs
+        if keepAlivePeriod > 0:
+            extra["keepAlivePeriod"] = keepAlivePeriod
         if xmux:
-            config["xmux"] = xmux
-
+            extra["xmux"] = xmux
+        if downloadSettings:
+            extra["downloadSettings"] = downloadSettings
+        if extra:
+            config["extra"] = extra
         # core will ignore unknown variables
 
         return config
@@ -635,6 +756,10 @@ class V2rayJsonConfig(str):
     def http_config(self, net="http", path: str = "", host: str = "", random_user_agent: bool = False) -> dict:
         if net == "h2":
             config = copy.deepcopy(self.settings.get("h2Settings", {
+                "header": {}
+            }))
+        elif net == "h3":
+            config = copy.deepcopy(self.settings.get("h3Settings", {
                 "header": {}
             }))
         else:
@@ -818,7 +943,8 @@ class V2rayJsonConfig(str):
     def make_dialer_outbound(fragment: str = "", noises: str = "") -> Union[dict, None]:
         dialer_settings = {}
         if fragment:
-            dialer_settings["fragment"] = V2rayJsonConfig.make_fragment(fragment)
+            dialer_settings["fragment"] = V2rayJsonConfig.make_fragment(
+                fragment)
         if noises:
             dialer_settings["noises"] = V2rayJsonConfig.make_noises(noises)
 
@@ -847,20 +973,26 @@ class V2rayJsonConfig(str):
                             dialer_proxy='',
                             multiMode: bool = False,
                             random_user_agent: bool = False,
-                            sc_max_each_post_bytes: int = 1000000,
-                            sc_max_concurrent_posts: int = 100,
-                            sc_min_posts_interval_ms: int = 30,
-                            x_padding_bytes: str = "100-1000",
+                            sc_max_each_post_bytes: int | None = None,
+                            sc_max_concurrent_posts: int | None = None,
+                            sc_min_posts_interval_ms: int | None = None,
+                            x_padding_bytes: str | None = None,
                             xmux: dict = {},
+                            downloadSettings: dict = {},
+                            mode: str = "",
+                            noGRPCHeader: bool | None = None,
+                            scStreamUpServerSecs: int | None = None,
+                            heartbeatPeriod: int = 0,
+                            keepAlivePeriod: int = 0,
                             ) -> dict:
 
         if net == "ws":
             network_setting = self.ws_config(
-                path=path, host=host, random_user_agent=random_user_agent)
+                path=path, host=host, random_user_agent=random_user_agent, heartbeatPeriod=heartbeatPeriod)
         elif net == "grpc":
             network_setting = self.grpc_config(
                 path=path, host=host, multiMode=multiMode, random_user_agent=random_user_agent)
-        elif net in ("h2", "http"):
+        elif net in ("h3", "h2", "http"):
             network_setting = self.http_config(
                 net=net, path=path, host=host, random_user_agent=random_user_agent)
         elif net == "kcp":
@@ -875,13 +1007,18 @@ class V2rayJsonConfig(str):
         elif net == "httpupgrade":
             network_setting = self.httpupgrade_config(
                 path=path, host=host, random_user_agent=random_user_agent)
-        elif net == "splithttp":
+        elif net in ("splithttp", "xhttp"):
             network_setting = self.splithttp_config(path=path, host=host, random_user_agent=random_user_agent,
                                                     sc_max_each_post_bytes=sc_max_each_post_bytes,
                                                     sc_max_concurrent_posts=sc_max_concurrent_posts,
                                                     sc_min_posts_interval_ms=sc_min_posts_interval_ms,
                                                     x_padding_bytes=x_padding_bytes,
                                                     xmux=xmux,
+                                                    downloadSettings=downloadSettings,
+                                                    mode=mode,
+                                                    noGRPCHeader=noGRPCHeader,
+                                                    keepAlivePeriod=keepAlivePeriod,
+                                                    scStreamUpServerSecs=scStreamUpServerSecs,
                                                     )
         else:
             network_setting = {}
@@ -984,11 +1121,17 @@ class V2rayJsonConfig(str):
             dialer_proxy=dialer_proxy,
             multiMode=multi_mode,
             random_user_agent=inbound.get('random_user_agent', False),
-            sc_max_each_post_bytes=inbound.get('scMaxEachPostBytes', 1000000),
-            sc_max_concurrent_posts=inbound.get('scMaxConcurrentPosts', 100),
-            sc_min_posts_interval_ms=inbound.get('scMinPostsIntervalMs', 30),
-            x_padding_bytes=inbound.get("xPaddingBytes", "100-1000"),
+            sc_max_each_post_bytes=inbound.get('scMaxEachPostBytes'),
+            sc_max_concurrent_posts=inbound.get('scMaxConcurrentPosts'),
+            sc_min_posts_interval_ms=inbound.get('scMinPostsIntervalMs'),
+            x_padding_bytes=inbound.get("xPaddingBytes"),
             xmux=inbound.get("xmux", {}),
+            downloadSettings=inbound.get("downloadSettings", {}),
+            mode=inbound.get("mode", "auto"),
+            noGRPCHeader=inbound.get("noGRPCHeader"),
+            heartbeatPeriod=inbound.get("heartbeatPeriod", 0),
+            keepAlivePeriod=inbound.get("keepAlivePeriod", 0),
+            scStreamUpServerSecs=inbound.get("scStreamUpServerSecs"),
         )
 
         mux_json = json.loads(self.mux_template)

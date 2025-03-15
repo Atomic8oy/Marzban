@@ -1,11 +1,11 @@
+import re
 from datetime import datetime as dt
 
 from dateutil.relativedelta import relativedelta
 
-from app.models.user import User, UserStatus, UserResponse
+from app.models.user import User, UserResponse, UserStatus
 from app.models.user_template import UserTemplate
 from app.utils.system import readable_size
-
 
 statuses = {
     UserStatus.active: "✅",
@@ -47,7 +47,7 @@ def time_to_string(time: dt):
 
 
 def get_user_info_text(db_user: User) -> str:
-    user: UserResponse = UserResponse.from_orm(db_user)
+    user: UserResponse = UserResponse.model_validate(db_user)
     data_limit = readable_size(user.data_limit) if user.data_limit else "Unlimited"
     used_traffic = readable_size(user.used_traffic) if user.used_traffic else "-"
     data_left = readable_size(user.data_limit - user.used_traffic) if user.data_limit else "-"
@@ -58,7 +58,8 @@ def get_user_info_text(db_user: User) -> str:
     online_at = time_to_string(user.online_at) if user.online_at else "-"
     sub_updated_at = time_to_string(user.sub_updated_at) if user.sub_updated_at else "-"
     if user.status == UserStatus.on_hold:
-        expiry_text = f"⏰ <b>On Hold Duration:</b> <code>{on_hold_duration} days</code> (auto start at <code>{on_hold_timeout}</code>)"
+        expiry_text = f"⏰ <b>On Hold Duration:</b> <code>{on_hold_duration} days</code> (auto start at <code>{
+            on_hold_timeout}</code>)"
     else:
         expiry_text = f"📅 <b>Expiry Date:</b> <code>{expiry_date}</code> ({time_left})"
     return f"""\
@@ -71,7 +72,7 @@ def get_user_info_text(db_user: User) -> str:
 {expiry_text}
 
 🔌 <b>Online at:</b> {online_at}
-🔄 <b>Subscription updated at:</b> {sub_updated_at} 
+🔄 <b>Subscription updated at:</b> {sub_updated_at}
 📱 <b>Subscription last agent:</b> <blockquote>{user.sub_last_user_agent or "-"}</blockquote>
 
 📝 <b>Note:</b> <blockquote expandable>{user.note or "empty"}</blockquote>
@@ -96,3 +97,9 @@ Username Prefix: <b>{template.username_prefix if template.username_prefix else "
 Username Suffix: <b>{template.username_suffix if template.username_suffix else "-"}</b>
 Protocols: {protocols}"""
     return text
+
+
+def get_number_at_end(username: str):
+    n = re.search(r'(\d+)$', username)
+    if n:
+        return n.group(1)

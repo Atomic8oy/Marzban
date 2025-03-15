@@ -22,6 +22,7 @@ class Notification(BaseModel):
         user_enabled = "user_enabled"
         user_disabled = "user_disabled"
         data_usage_reset = "data_usage_reset"
+        data_reset_by_next = "data_reset_by_next"
         subscription_revoked = "subscription_revoked"
 
         reached_usage_percent = "reached_usage_percent"
@@ -77,7 +78,7 @@ class UserExpired(UserNotification):
 
 class UserEnabled(UserNotification):
     action: Notification.Type = Notification.Type.user_enabled
-    by: Admin = None
+    by: Admin | None = None
     user: UserResponse
 
 
@@ -85,7 +86,7 @@ class UserDisabled(UserNotification):
     action: Notification.Type = Notification.Type.user_disabled
     by: Admin
     user: UserResponse
-    reason: str = None
+    reason: str | None = None
 
 
 class UserDataUsageReset(UserNotification):
@@ -94,8 +95,13 @@ class UserDataUsageReset(UserNotification):
     user: UserResponse
 
 
+class UserDataResetByNext(UserNotification):
+    action: Notification.Type = Notification.Type.data_usage_reset
+    user: UserResponse
+
+
 class UserSubscriptionRevoked(UserNotification):
-    action = Notification.Type = Notification.Type.subscription_revoked
+    action: Notification.Type = Notification.Type.subscription_revoked
     by: Admin
     user: UserResponse
 

@@ -59,13 +59,14 @@
   </a>
 </p>
 
-
 ## 目录
+
 - [概览](#概览)
   - [为什么要使用 Marzban?](#为什么要使用-marzban)
     - [特性](#特性)
 - [安装指南](#安装指南)
 - [配置](#配置)
+- [文档](#文档)
 - [如何使用 API](#如何使用-api)
 - [如何备份 Marzban](#如何备份-marzban)
 - [Telegram bot](#telegram-bot)
@@ -73,12 +74,9 @@
 - [许可](#许可)
 - [贡献者](#贡献者)
 
-
 # 概览
 
-Marzban（Marzban一词源自波斯语，意为“边境警卫”，发音为 /mærz'ban/）是一个代理管理工具，提供简单易用的用户界面，可管理数百个代理账户，由 [Xray-core](https://github.com/XTLS/Xray-core) 提供支持，使用 Python 和 Reactjs 构建。
-
-
+Marzban（Marzban 一词源自波斯语，意为“边境警卫”，发音为 /mærz'ban/）是一个代理管理工具，提供简单易用的用户界面，可管理数百个代理账户，由 [Xray-core](https://github.com/XTLS/Xray-core) 提供支持，使用 Python 和 Reactjs 构建。
 
 ## 为什么要使用 Marzban?
 
@@ -94,7 +92,7 @@ Marzban 是一个用户友好、功能丰富且可靠的工具。它让您可以
 - 单端口的**多入站**支持（使用 fallbacks）
 - **流量**和**过期日期**限制
 - 周期性的流量限制（例如每天、每周等）
-- 兼容 **V2ray** 的**订阅链接**（例如 V2RayNG、OneClick、Nekoray 等）和 **Clash**
+- 兼容 **V2ray** 的**订阅链接**（例如 V2RayNG、SingBox、Nekoray 等）和 **Clash**
 - 自动化的**分享链接**和**二维码**生成器
 - 系统监控和**流量统计**
 - 可自定义的 xray 配置
@@ -102,12 +100,24 @@ Marzban 是一个用户友好、功能丰富且可靠的工具。它让您可以
 - 集成的 **Telegram Bot**
 - **多管理员**支持（WIP）
 
-
 # 安装指南
-Run the following command
+
+运行以下命令以使用 SQLite 数据库安装 Marzban。
 
 ```bash
 sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install
+```
+
+运行以下命令以使用 MySQL 数据库安装 Marzban。
+
+```bash
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install --database mysql
+```
+
+运行以下命令以使用 MariaDB 数据库安装 Marzban。
+
+```bash
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install --database mariadb
 ```
 
 Once the installation is complete:
@@ -116,7 +126,18 @@ Once the installation is complete:
 - The Marzban files will be located at `/opt/marzban`
 - The configuration file can be found at `/opt/marzban/.env` (refer to [configurations](#configuration) section to see variables)
 - The data files will be placed at `/usr/lib/marzban`
-- You can access the Marzban dashboard by opening a web browser and navigating to `http://YOUR_SERVER_IP:8000/dashboard/` (replace YOUR_SERVER_IP with the actual IP address of your server)
+- For security reasons, the Marzban dashboard is not accessible via IP address. Therefore, you must [obtain SSL certificate](https://gozargah.github.io/marzban/en/examples/issue-ssl-certificate) and access your Marzban dashboard by opening a web browser and navigating to `https://YOUR_DOMAIN:8000/dashboard/` (replace YOUR_DOMAIN with your actual domain)
+- You can also use SSH port forwarding to access the Marzban dashboard locally without a domain. Replace `user@serverip` with your actual SSH username and server IP and Run the command below:
+
+```bash
+ssh -L 8000:localhost:8000 user@serverip
+```
+
+Finally, you can enter the following link in your browser to access your Marzban dashboard:
+
+http://localhost:8000/dashboard/
+
+You will lose access to the dashboard as soon as you close the SSH terminal. Therefore, this method is recommended only for testing purposes.
 
 Next, you need to create a sudo admin for logging into the Marzban dashboard by the following command
 
@@ -133,6 +154,7 @@ marzban --help
 ```
 
 If you are eager to run the project using the source code, check the section below
+
 <details markdown="1">
 <summary><h3>手动安装（高级）</h3></summary>
 
@@ -146,7 +168,7 @@ bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release
 
 克隆项目并安装依赖项。
 
-您需要 Python>=3.8 版本。
+您需要 Python>=3.12.7 版本。
 
 ```bash
 git clone https://github.com/Gozargah/Marzban.git
@@ -183,12 +205,14 @@ python3 main.py
 ```
 
 也可使用 linux systemctl 启动：
+
 ```
 systemctl enable /var/lib/marzban/marzban.service
 systemctl start marzban
 ```
 
 配合 nginx 使用：
+
 ```
 server {
     listen 443 ssl http2;
@@ -198,7 +222,7 @@ server {
     ssl_certificate      /etc/letsencrypt/live/example.com/fullchain.pem;
     ssl_certificate_key  /etc/letsencrypt/live/example.com/privkey.pem;
 
-    location ~* /(dashboard|api|docs|redoc|openapi.json) {
+    location ~* /(dashboard|statics|sub|api|docs|redoc|openapi.json) {
         proxy_pass http://0.0.0.0:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -224,7 +248,9 @@ server {
     }
 }
 ```
+
 或
+
 ```
 server {
     listen 443 ssl http2;
@@ -244,6 +270,7 @@ server {
 ```
 
 默认情况下，应用将在 `http://localhost:8000/dashboard` 上运行。您可以通过更改 `UVICORN_HOST` 和 `UVICORN_PORT` 环境变量来进行配置。
+
 </details>
 
 # 配置
@@ -260,10 +287,11 @@ server {
 | UVICORN_UDS                              | 将应用程序绑定到一个 UNIX 域套接字                                                                                       |
 | UVICORN_SSL_CERTFILE                     | SSL 证书文件路径                                                                                                         |
 | UVICORN_SSL_KEYFILE                      | SSL 密钥文件路径                                                                                                         |
+| UVICORN_SSL_CA_TYPE                      | 授权 SSL 证书的类型。使用“private”来测试自签名 CA（默认值：`public`）                                                    |
 | XRAY_JSON                                | Xray 的 json 配置文件路径（默认: `xray_config.json`）                                                                    |
 | XRAY_EXECUTABLE_PATH                     | Xray 的执行程序路径: `/usr/local/bin/xray`）                                                                             |
 | XRAY_ASSETS_PATH                         | Xray 的资源目录: `/usr/local/share/xray`）                                                                               |
-| XRAY_SUBSCRIPTION_URL_PREFIX             | 订阅URL的前缀                                                                                                            |
+| XRAY_SUBSCRIPTION_URL_PREFIX             | 订阅 URL 的前缀                                                                                                          |
 | XRAY_FALLBACKS_INBOUND_TAG               | 包含 fallbacks 的入站标记, 在您需要使用 fallbacks 配置此项                                                               |
 | XRAY_EXCLUDE_INBOUND_TAGS                | 不需要此应用程序管理或在链接中包含的入站标记                                                                             |
 | CLASH_SUBSCRIPTION_TEMPLATE              | 将用于生成冲突配置的模板（默认值：`clash/default.yml`）                                                                  |
@@ -288,10 +316,13 @@ server {
 | USE_CUSTOM_JSON_FOR_STREISAND            | Enable custom JSON config only for Streisand (default: `False`)                                                          |
 | USE_CUSTOM_JSON_FOR_V2RAYN               | Enable custom JSON config only for V2rayN (default: `False`)                                                             |
 
+# 文档
+
+[Marzban 文档](https://gozargah.github.io/marzban) 提供了所有必要的入门指南，支持三种语言：波斯语、英语和俄语。要全面覆盖项目的各个方面，这些文档需要大量的工作。我们欢迎并感谢您的贡献，以帮助我们改进文档。您可以在这个 [GitHub 仓库](https://github.com/Gozargah/gozargah.github.io) 中进行贡献。
 
 # 如何使用 API
-Marzban 提供了 REST API，使开发人员能够以编程方式与 Marzban 服务进行交互。要在 Swagger UI 或 ReDoc 中查看 API 文档，设置配置变量 `DOCS=True`，然后导航到 `/docs` 和 `/redoc`。
 
+Marzban 提供了 REST API，使开发人员能够以编程方式与 Marzban 服务进行交互。要在 Swagger UI 或 ReDoc 中查看 API 文档，设置配置变量 `DOCS=True`，然后导航到 `/docs` 和 `/redoc`。
 
 # 如何备份 Marzban
 
@@ -300,8 +331,27 @@ Marzban 提供了 REST API，使开发人员能够以编程方式与 Marzban 服
 1. 默认情况下，所有重要的 Marzban 文件都保存在 `/var/lib/marzban` ( Docker 版本)中。将整个 `/var/lib/marzban` 目录复制到您选择的备份位置，比如外部硬盘或云存储。
 2. 此外，请确保备份您的 `env` 文件，其中包含您的配置变量，以及您的 `Xray` 配置文件。
 
-按照这些步骤，您可以确保有备份所有 Marzban 文件和数据，以及您的配置变量和 Xray 配置，以备将来恢复使用。请记得定期更新备份，以保持它们的最新性。
+Marzban 的备份服务会高效地压缩所有必要文件并将它们发送到您指定的 Telegram 机器人。它支持 SQLite、MySQL 和 MariaDB 数据库。其一个主要功能是自动化，允许您每小时安排一次备份。对于 Telegram 机器人的上传限制没有限制；如果文件超过限制，它会被拆分并以多个部分发送。此外，您可以在任何时间启动即时备份。
 
+安装最新版 Marzban 命令：
+
+```bash
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install-script
+```
+
+设置备份服务：
+
+```bash
+marzban backup-service
+```
+
+获取即时备份：
+
+```bash
+marzban backup
+```
+
+按照这些步骤，您可以确保有备份所有 Marzban 文件和数据，以及您的配置变量和 Xray 配置，以备将来恢复使用。请记得定期更新备份，以保持它们的最新性。
 
 # Telegram bot
 
@@ -312,7 +362,6 @@ Marzban 配备了一个集成的 Telegram bot，可以处理服务器管理、�
 1. 将 `TELEGRAM_API_TOKEN` 设置为您的 bot API Token。
 2. 将 `TELEGRAM_ADMIN_ID` 设置为您的 Telegram ID，您可以从 [@userinfobot](https://t.me/userinfobot) 中获取自己的 ID。
 
-
 # 捐赠
 
 如果您认为 Marzban 有用，并想支持其发展，可以在以下加密网络之一进行捐赠：
@@ -322,7 +371,6 @@ Marzban 配备了一个集成的 Telegram bot，可以处理服务器管理、�
 - 比特币网络：`bc1qpys2nefgsjjgae3g3gqy9crsv3h3rm96tlkz0v`
 - Dogecoin 网络：`DJAocBAu8y6LwhDKUktLAyzV8xyoFeHH6R`
 - TON 网络：`EQAVf-7hAXHlF-jmrKE44oBwN7HGQFVBLAtrOsev5K4qR4P8`
-
 
 感谢您的支持！
 
@@ -336,8 +384,6 @@ Marzban 配备了一个集成的 Telegram bot，可以处理服务器管理、�
 
 查看 [issues](https://github.com/gozargah/marzban/issues) 以帮助改进这个项目。
 
-
-
 <p align="center">
 感谢所有为改善 Marzban 做出贡献的贡献者们：
 </p>
@@ -349,4 +395,3 @@ Marzban 配备了一个集成的 Telegram bot，可以处理服务器管理、�
 <p align="center">
   Made with <a rel="noopener noreferrer" target="_blank" href="https://contrib.rocks">contrib.rocks</a>
 </p>
-

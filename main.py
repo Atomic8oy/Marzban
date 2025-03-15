@@ -2,6 +2,8 @@ import click
 import logging
 import os
 import ssl
+import ipaddress
+import socket
 
 import uvicorn
 from cryptography import x509
@@ -12,9 +14,50 @@ from config import (DEBUG, UVICORN_HOST, UVICORN_PORT, UVICORN_SSL_CERTFILE,
                     UVICORN_SSL_KEYFILE, UVICORN_UDS)
 
 
+def check_and_modify_ip(ip_address: str) -> str:
+    """
+    Check if an IP address is private. If not, return localhost.
+
+    IPv4 Private range = [
+        "192.168.0.0",
+        "192.168.255.255",
+        "10.0.0.0",
+        "10.255.255.255",
+        "172.16.0.0",
+        "172.31.255.255"
+    ]
+
+    Args:
+        ip_address (str): IP address to check
+
+    Returns:
+        str: Original IP if private, otherwise localhost
+
+    Raises:
+        ValueError: If the provided IP address is invalid, return localhost.
+    """
+    try:
+        # Attempt to resolve hostname to IP address
+        resolved_ip = socket.gethostbyname(ip_address)
+
+        # Convert string to IP address object
+        ip = ipaddress.ip_address(resolved_ip)
+
+        if ip == ipaddress.ip_address("0.0.0.0"):
+            return "localhost"
+        elif ip.is_private:
+            return ip_address
+        else:
+            return "localhost"
+
+    except ValueError as e:
+        return "localhost"
+
+
 def validate_cert_and_key(cert_file_path, key_file_path):
     if not os.path.isfile(cert_file_path):
-        raise ValueError(f"SSL certificate file '{cert_file_path}' does not exist.")
+        raise ValueError(
+            f"SSL certificate file '{cert_file_path}' does not exist.")
     if not os.path.isfile(key_file_path):
         raise ValueError(f"SSL key file '{key_file_path}' does not exist.")
 
@@ -30,7 +73,8 @@ def validate_cert_and_key(cert_file_path, key_file_path):
             cert = x509.load_pem_x509_certificate(cert_data, default_backend())
 
         if cert.issuer == cert.subject:
-            raise ValueError("The certificate is self-signed and not issued by a trusted CA.")
+            raise ValueError(
+                "The certificate is self-signed and not issued by a trusted CA.")
 
     except Exception as e:
         raise ValueError(f"Certificate verification failed: {e}")
@@ -58,6 +102,7 @@ if __name__ == "__main__":
         if UVICORN_UDS:
             bind_args['uds'] = UVICORN_UDS
         else:
+            ip = check_and_modify_ip(UVICORN_HOST)
 
             logger.warning(f"""
 {click.style('IMPORTANT!', blink=True, bold=True, fg="yellow")}
@@ -72,10 +117,10 @@ Use the following command:
 
 {click.style(f'ssh -L {UVICORN_PORT}:localhost:{UVICORN_PORT} user@server', italic=True, fg="cyan")}
 
-Then, navigate to {click.style(f'http://127.0.0.1:{UVICORN_PORT}', bold=True)} on your computer.
+Then, navigate to {click.style(f'http://{ip}:{UVICORN_PORT}', bold=True)} on your computer.
             """)
 
-            bind_args['host'] = '127.0.0.1'
+            bind_args['host'] = ip
             bind_args['port'] = UVICORN_PORT
 
     if DEBUG:

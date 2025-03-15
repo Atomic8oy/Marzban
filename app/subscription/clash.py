@@ -1,17 +1,19 @@
 import copy
 import json
 from random import choice
+from uuid import UUID
 
 import yaml
 from jinja2.exceptions import TemplateNotFound
 
 from app.subscription.funcs import get_grpc_gun
 from app.templates import render_template
+from app.utils.helpers import yml_uuid_representer
 from config import (
     CLASH_SETTINGS_TEMPLATE,
     CLASH_SUBSCRIPTION_TEMPLATE,
     MUX_TEMPLATE,
-    USER_AGENT_TEMPLATE
+    USER_AGENT_TEMPLATE,
 )
 
 
@@ -42,6 +44,8 @@ class ClashConfiguration(object):
     def render(self, reverse=False):
         if reverse:
             self.data['proxies'].reverse()
+
+        yaml.add_representer(UUID, yml_uuid_representer)
         return yaml.dump(
             yaml.load(
                 render_template(
@@ -49,6 +53,7 @@ class ClashConfiguration(object):
                     {"conf": self.data, "proxy_remarks": self.proxy_remarks}
                 ),
                 Loader=yaml.SafeLoader
+
             ),
             sort_keys=False,
             allow_unicode=True,
@@ -109,13 +114,12 @@ class ClashConfiguration(object):
             config["headers"]["Host"] = host
         if random_user_agent:
             config["headers"]["User-Agent"] = choice(self.user_agent_list)
-        if max_early_data:
+        if max_early_data and not is_httpupgrade:
             config["max-early-data"] = max_early_data
             config["early-data-header-name"] = early_data_header_name
         if is_httpupgrade:
             config["v2ray-http-upgrade"] = True
-            if max_early_data:
-                config["v2ray-http-upgrade-fast-open"] = True
+            config["v2ray-http-upgrade-fast-open"] = True
 
         return config
 
@@ -169,6 +173,8 @@ class ClashConfiguration(object):
 
         if type == 'shadowsocks':
             type = 'ss'
+        if network in ("http", "h2", "h3"):
+            network = "h2"
         if network in ('tcp', 'raw') and headers == 'http':
             network = 'http'
         if network == 'httpupgrade':
@@ -176,7 +182,6 @@ class ClashConfiguration(object):
             is_httpupgrade = True
         else:
             is_httpupgrade = False
-
         node = {
             'name': remark,
             'type': type,
@@ -244,14 +249,13 @@ class ClashConfiguration(object):
         mux_config = mux_json["clash"]
 
         if mux_enable:
-            net_opts['smux'] = mux_config
-            net_opts['smux']["enabled"] = True
+            node['smux'] = mux_config
 
         return node
 
     def add(self, remark: str, address: str, inbound: dict, settings: dict):
         # not supported by clash
-        if inbound['network'] in ("kcp", "splithttp"):
+        if inbound['network'] in ("kcp", "splithttp", "xhttp"):
             return
 
         proxy_remark = self._remark_validation(remark)
@@ -342,7 +346,7 @@ class ClashMetaConfiguration(ClashConfiguration):
 
     def add(self, remark: str, address: str, inbound: dict, settings: dict):
         # not supported by clash-meta
-        if inbound['network'] in ("kcp", "splithttp") or (inbound['network'] == "quic" and inbound["header_type"] != "none"):
+        if inbound['network'] in ("kcp", "splithttp", "xhttp") or (inbound['network'] == "quic" and inbound["header_type"] != "none"):
             return
 
         proxy_remark = self._remark_validation(remark)

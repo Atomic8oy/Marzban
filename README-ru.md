@@ -66,6 +66,7 @@
     - [Функции](#функции)
 - [Руководство по установке](#руководство-по-установке)
 - [Конфигурация](#конфигурация)
+- [документация](#документация)
 - [API](#api)
 - [Backup](#backup)
 - [Telegram Bot](#telegram-bot)
@@ -95,11 +96,11 @@ Marzban удобен в использовании, многофункциона
 - **Несколько inbound** на **одном порту** (поддержка fallbacks)
 - Ограничения на основе **количества трафика** и **срока действия**
 - Ограничение трафика по **периодам** (например выдавать трафик на день, неделю и т. д.)
-- Поддержка **ссылок-подписок** совместимых с **V2ray** _(такие как V2RayNG, OneClick, Nekoray, и др.)_, **Clash** и **ClashMeta**
-- Автоматическая генерация **Ссылок** и **QRcode** 
+- Поддержка **ссылок-подписок** совместимых с **V2ray** _(такие как V2RayNG, SingBox, Nekoray, и др.)_, **Clash** и **ClashMeta**
+- Автоматическая генерация **Ссылок** и **QRcode**
 - Мониторинг ресурсов сервера и **использования трафика**
 - Настраиваемые конфигурации xray
-- Поддержка **TLS** и **REALITY** 
+- Поддержка **TLS** и **REALITY**
 - Встроенный **Telegram Bot**
 - Встроенный **Command Line Interface (CLI)**
 - **Несколько языков**
@@ -107,20 +108,44 @@ Marzban удобен в использовании, многофункциона
 
 # Руководство по установке
 
-Выполните быструю установку с помощью следующей команды:
+Установка Marzban с базой данных SQLite (по умолчанию):
 
 ```bash
 sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install
 ```
 
+Установка Marzban с базой данных MySQL:
+
+```bash
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install --database mysql
+```
+
+Установка Marzban с базой данных MariaDB:
+
+```bash
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install --database mariadb
+```
+
 Когда установка будет завершена:
+
 - Вы увидите логи, которые можно остановить, нажав `Ctrl+C` или закрыв терминал.
 - Файлы Marzban будут размещены по адресу `/opt/marzban`.
 - Файл конфигурации будет размещен по адресу `/opt/marzban/.env` (см. [Конфигурация](#конфигурация)).
 - Файлы с данными будут размещены по адресу `/var/lib/marzban`.
-- Вы можете получить доступ к панели управления, введя в адресной строке `http://YOUR_SERVER_IP:8000/dashboard/` (заменив YOUR_SERVER_IP на актуальный IP адрес вашего сервера).
+- По соображениям безопасности, панель управления Marzban недоступна через IP-адрес. Поэтому вам необходимо [получить SSL-сертификат](https://gozargah.github.io/marzban/ru/examples/issue-ssl-certificate) и получить доступ к панели управления Marzban, открыв веб-браузер и перейдя по адресу `https://YOUR_DOMAIN:8000/dashboard/` (замените YOUR_DOMAIN на ваш фактический домен).
+- Вы также можете использовать перенаправление портов SSH для локального доступа к панели управления Marzban без домена. Замените `user@serverip` на ваше фактическое имя пользователя SSH и IP-адрес сервера и выполните следующую команду:
 
-Далее, Вам нужно создать главного администратора для входа в панель управления Marzban, выполнив следующую команду: 
+```bash
+ssh -L 8000:localhost:8000 user@serverip
+```
+
+Наконец, введите следующую ссылку в ваш браузер, чтобы получить доступ к панели управления Marzban:
+
+http://localhost:8000/dashboard/
+
+Вы потеряете доступ к панели управления, как только закроете терминал SSH. Поэтому этот метод рекомендуется использовать только для тестирования.
+
+Далее, Вам нужно создать главного администратора для входа в панель управления Marzban, выполнив следующую команду:
 
 ```bash
 marzban cli admin create --sudo
@@ -135,6 +160,7 @@ marzban --help
 ```
 
 Если Вы хотите запустить проект, используя его исходный код, обратитесь к разделу ниже
+
 <details markdown="1">
 <summary><h3>Ручная установка</h3></summary>
 
@@ -146,7 +172,7 @@ marzban --help
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 ```
 
-Клонируйте этот проект и установите зависимости (Вам нужен Python >= 3.8):
+Клонируйте этот проект и установите зависимости (Вам нужен Python >= 3.12.7):
 
 ```bash
 git clone https://github.com/Gozargah/Marzban.git
@@ -208,7 +234,7 @@ server {
     ssl_certificate      /etc/letsencrypt/live/example.com/fullchain.pem;
     ssl_certificate_key  /etc/letsencrypt/live/example.com/privkey.pem;
 
-    location ~* /(dashboard|api|docs|redoc|openapi.json) {
+    location ~* /(dashboard|statics|sub|api|docs|redoc|openapi.json) {
         proxy_pass http://0.0.0.0:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -256,6 +282,7 @@ server {
 ```
 
 По умолчанию приложение будет запускаться на `http://localhost:8000/dashboard`. Вы можете настроить его, изменив переменные окружения `UVICORN_HOST` и `UVICORN_PORT`.
+
 </details>
 
 # Конфигурация
@@ -272,8 +299,9 @@ server {
 | UVICORN_UDS                              | Привязка приложения к UNIX domain socket                                                                                       |
 | UVICORN_SSL_CERTFILE                     | Адрес файла сертификата SSL                                                                                                    |
 | UVICORN_SSL_KEYFILE                      | Адрес файла ключа SSL                                                                                                          |
+| UVICORN_SSL_CA_TYPE                      | Тип центра сертификации ключа SSL. Используйте `private` для тестирования самоподписанных CA (по умолчанию: `public`)          |
 | XRAY_JSON                                | Адрес файла JSON конфигурации Xray. (по умолчанию: `xray_config.json`)                                                         |
-| XRAY_EXECUTABLE_PATH                     | Путь к бинарникам Xray  (по умолчанию: `/usr/local/bin/xray`)                                                                  |
+| XRAY_EXECUTABLE_PATH                     | Путь к бинарникам Xray (по умолчанию: `/usr/local/bin/xray`)                                                                   |
 | XRAY_ASSETS_PATH                         | Путь к папке с рессурсными файлами для Xray (файлы geoip.dat и geosite.dat) (по умолчанию: `/usr/local/share/xray`)            |
 | XRAY_SUBSCRIPTION_URL_PREFIX             | Префикс адреса подписки                                                                                                        |
 | XRAY_FALLBACKS_INBOUND_TAG               | Если вы используете входящее соединение с несколькими резервными вариантами, укажите здесь его тег                             |
@@ -282,7 +310,7 @@ server {
 | CLASH_SUBSCRIPTION_TEMPLATE              | Шаблон для создания конфигурации Clash (по умолчанию: `clash/default.yml`)                                                     |
 | SUBSCRIPTION_PAGE_TEMPLATE               | Шаблон для страницы подписки (по умолчанию: `subscription/index.html`)                                                         |
 | HOME_PAGE_TEMPLATE                       | Шаблон главной страницы (по умолчанию: `home/index.html`)                                                                      |
-| TELEGRAM_API_TOKEN                       | Токен Telegram-бота  (полученный от [@botfather](https://t.me/botfather))                                                      |
+| TELEGRAM_API_TOKEN                       | Токен Telegram-бота (полученный от [@botfather](https://t.me/botfather))                                                       |
 | TELEGRAM_ADMIN_ID                        | Числовой идентификатор администратора в Telegram (полученный от [@userinfobot](https://t.me/userinfobot))                      |
 | TELEGRAM_PROXY_URL                       | URL прокси для запуска Telegram-бота (если серверы Telegram заблокированы на вашем сервере).                                   |
 | JWT_ACCESS_TOKEN_EXPIRE_MINUTES          | Время истечения срока действия доступного токена в минутах, `0` означает "без истечения срока действия" (по умолчанию: `1440`) |
@@ -290,7 +318,7 @@ server {
 | DEBUG                                    | Активация режима разработки (development) (по умолчанию: `False`)                                                              |
 | WEBHOOK_ADDRESS                          | Адрес Webhook для отправки уведомлений. Уведомления Webhook будут отправляться, если это значение было установлено             |
 | WEBHOOK_SECRET                           | Webhook secret будет передаваться с каждым запросом в виде `x-webhook-secret` в заголовке (по умолчанию: `None`)               |
-| NUMBER_OF_RECURRENT_NOTIFICATIONS        | Сколько раз повторять попытку отправки уведомления при обнаружении ошибки  (по умолчанию: `3`)                                 |
+| NUMBER_OF_RECURRENT_NOTIFICATIONS        | Сколько раз повторять попытку отправки уведомления при обнаружении ошибки (по умолчанию: `3`)                                  |
 | RECURRENT_NOTIFICATIONS_TIMEOUT          | Тайм-аут между каждым повторным запросом при обнаружении ошибки в секундах (по умолчанию: `180`)                               |
 | NOTIFY_REACHED_USAGE_PERCENT             | При каком проценте использования отправлять предупреждение (по умолчанию: `80`)                                                |
 | NOTIFY_DAYS_LEFT                         | Когда отправлять предупреждение об истечении срока действия (по умолчанию: `3`)                                                |
@@ -301,9 +329,13 @@ server {
 | USE_CUSTOM_JSON_FOR_STREISAND            | Enable custom JSON config only for Streisand (default: `False`)                                                                |
 | USE_CUSTOM_JSON_FOR_V2RAYN               | Enable custom JSON config only for V2rayN (default: `False`)                                                                   |
 
+# документация
+
+[Документация Marzban](https://gozargah.github.io/marzban/ru/) предоставляет все необходимые руководства для начала работы и доступна на трех языках: фарси, английском и русском. Для полного охвата всех аспектов проекта требуется значительное количество усилий. Мы приветствуем и ценим ваш вклад в улучшение документации. Вы можете внести свой вклад в этот [репозиторий на GitHub](https://github.com/Gozargah/gozargah.github.io).
+
 # API
 
-Marzban предоставляет REST API, позволяющий разработчикам программно взаимодействовать с сервисами Marzban. Для просмотра документации по API в Swagger UI или ReDoc установите  переменную `DOCS=True` и перейдите по ссылкам `/docs` и `/redoc`.
+Marzban предоставляет REST API, позволяющий разработчикам программно взаимодействовать с сервисами Marzban. Для просмотра документации по API в Swagger UI или ReDoc установите переменную `DOCS=True` и перейдите по ссылкам `/docs` и `/redoc`.
 
 # Backup
 
@@ -323,6 +355,26 @@ Marzban поставляется с встроенным ботом Telegram, к
 1. установите `TELEGRAM_API_TOKEN` в качестве API-токена вашего бота.
 2. установите `TELEGRAM_ADMIN_ID` в качестве цифрового ID вашего Telegram-аккаунта, который вы можете получить от [@userinfobot](https://t.me/userinfobot)
 
+Сервис резервного копирования Marzban эффективно архивирует все необходимые файлы и отправляет их вашему указанному Telegram-боту. Он поддерживает базы данных SQLite, MySQL и MariaDB. Одной из ключевых особенностей является автоматизация, позволяющая настроить расписание резервного копирования, например, каждый час. При этом ограничений на размер файлов для загрузки в Telegram через бота нет: если файл превышает лимит, он будет автоматически разделен и отправлен частями. Также можно запустить резервное копирование вручную в любой момент.
+
+Установка последней версии Marzban:
+
+```bash
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install-script
+```
+
+Настройка сервиса резервного копирования:
+
+```bash
+marzban backup-service
+```
+
+Мгновенное резервное копирование:
+
+```bash
+marzban backup
+```
+
 # Marzban CLI
 
 Marzban поставляется с встроенным CLI под названием `marzban-cli`, который позволяет администраторам напрямую взаимодействовать с ним.
@@ -339,7 +391,6 @@ marzban cli [OPTIONS] COMMAND [ARGS]...
 
 Проект Marzban представляет [Marzban-node](https://github.com/gozargah/marzban-node), который помогает Вам в распределении инфраструктуры. С помощью Marzban-node можно распределить инфраструктуру по нескольким узлам, получив такие преимущества, как высокая доступность, масштабируемость и гибкость. Marzban-node позволяет пользователям подключаться к различным серверам, предоставляя им гибкость в выборе, а не ограничиваться только одним сервером.
 Более подробная информация и инструкции по установке приведены в [официальной документации Marzban-node](https://github.com/gozargah/marzban-node).
-
 
 # Webhook уведомления
 

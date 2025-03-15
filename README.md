@@ -66,6 +66,7 @@
     - [Features](#features)
 - [Installation guide](#installation-guide)
 - [Configuration](#configuration)
+- [Documentation](#documentation)
 - [API](#api)
 - [Backup](#backup)
 - [Telegram Bot](#telegram-bot)
@@ -95,7 +96,7 @@ Marzban is user-friendly, feature-rich and reliable. It lets you to create diffe
 - **Multi-inbound** on a **single port** (fallbacks support)
 - **Traffic** and **expiry date** limitations
 - **Periodic** traffic limit (e.g. daily, weekly, etc.)
-- **Subscription link** compatible with **V2ray** _(such as V2RayNG, OneClick, Nekoray, etc.)_, **Clash** and **ClashMeta**
+- **Subscription link** compatible with **V2ray** _(such as V2RayNG, SingBox, Nekoray, etc.)_, **Clash** and **ClashMeta**
 - Automated **Share link** and **QRcode** generator
 - System monitoring and **traffic statistics**
 - Customizable xray configuration
@@ -107,10 +108,22 @@ Marzban is user-friendly, feature-rich and reliable. It lets you to create diffe
 
 # Installation guide
 
-Run the following command
+Run the following command to install Marzban with SQLite database:
 
 ```bash
 sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install
+```
+
+Run the following command to install Marzban with MySQL database:
+
+```bash
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install --database mysql
+```
+
+Run the following command to install Marzban with MariaDB database:
+
+```bash
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install --database mariadb
 ```
 
 Once the installation is complete:
@@ -119,7 +132,18 @@ Once the installation is complete:
 - The Marzban files will be located at `/opt/marzban`
 - The configuration file can be found at `/opt/marzban/.env` (refer to [configurations](#configuration) section to see variables)
 - The data files will be placed at `/var/lib/marzban`
-- You can access the Marzban dashboard by opening a web browser and navigating to `http://YOUR_SERVER_IP:8000/dashboard/` (replace YOUR_SERVER_IP with the actual IP address of your server)
+- For security reasons, the Marzban dashboard is not accessible via IP address. Therefore, you must [obtain SSL certificate](https://gozargah.github.io/marzban/en/examples/issue-ssl-certificate) and access your Marzban dashboard by opening a web browser and navigating to `https://YOUR_DOMAIN:8000/dashboard/` (replace YOUR_DOMAIN with your actual domain)
+- You can also use SSH port forwarding to access the Marzban dashboard locally without a domain. Replace `user@serverip` with your actual SSH username and server IP and Run the command below:
+
+```bash
+ssh -L 8000:localhost:8000 user@serverip
+```
+
+Finally, you can enter the following link in your browser to access your Marzban dashboard:
+
+http://localhost:8000/dashboard/
+
+You will lose access to the dashboard as soon as you close the SSH terminal. Therefore, this method is recommended only for testing purposes.
 
 Next, you need to create a sudo admin for logging into the Marzban dashboard by the following command
 
@@ -136,6 +160,7 @@ marzban --help
 ```
 
 If you are eager to run the project using the source code, check the section below
+
 <details markdown="1">
 <summary><h3>Manual install (advanced)</h3></summary>
 
@@ -147,7 +172,7 @@ You can install it using [Xray-install](https://github.com/XTLS/Xray-install)
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 ```
 
-Clone this project and install the dependencies (you need Python >= 3.8)
+Clone this project and install the dependencies (you need Python >= 3.12.7)
 
 ```bash
 git clone https://github.com/Gozargah/Marzban.git
@@ -209,7 +234,7 @@ server {
     ssl_certificate      /etc/letsencrypt/live/example.com/fullchain.pem;
     ssl_certificate_key  /etc/letsencrypt/live/example.com/privkey.pem;
 
-    location ~* /(dashboard|api|docs|redoc|openapi.json) {
+    location ~* /(dashboard|statics|sub|api|docs|redoc|openapi.json) {
         proxy_pass http://0.0.0.0:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -257,6 +282,7 @@ server {
 ```
 
 By default the app will be run on `http://localhost:8000/dashboard`. You can configure it using changing the `UVICORN_HOST` and `UVICORN_PORT` environment variables.
+
 </details>
 
 # Configuration
@@ -273,6 +299,7 @@ By default the app will be run on `http://localhost:8000/dashboard`. You can con
 | UVICORN_UDS                              | Bind application to a UNIX domain socket                                                                                 |
 | UVICORN_SSL_CERTFILE                     | SSL certificate file to have application on https                                                                        |
 | UVICORN_SSL_KEYFILE                      | SSL key file to have application on https                                                                                |
+| UVICORN_SSL_CA_TYPE                      | Type of authority SSL certificate. Use `private` for testing self-signed CA (default: `public`)                          |
 | XRAY_JSON                                | Path of Xray's json config file (default: `xray_config.json`)                                                            |
 | XRAY_EXECUTABLE_PATH                     | Path of Xray binary (default: `/usr/local/bin/xray`)                                                                     |
 | XRAY_ASSETS_PATH                         | Path of Xray assets (default: `/usr/local/share/xray`)                                                                   |
@@ -283,7 +310,7 @@ By default the app will be run on `http://localhost:8000/dashboard`. You can con
 | CLASH_SUBSCRIPTION_TEMPLATE              | The template that will be used for generating clash configs (default: `clash/default.yml`)                               |
 | SUBSCRIPTION_PAGE_TEMPLATE               | The template used for generating subscription info page (default: `subscription/index.html`)                             |
 | HOME_PAGE_TEMPLATE                       | Decoy page template (default: `home/index.html`)                                                                         |
-| TELEGRAM_API_TOKEN                       | Telegram bot API token  (get token from [@botfather](https://t.me/botfather))                                            |
+| TELEGRAM_API_TOKEN                       | Telegram bot API token (get token from [@botfather](https://t.me/botfather))                                             |
 | TELEGRAM_ADMIN_ID                        | Numeric Telegram ID of admin (use [@userinfobot](https://t.me/userinfobot) to found your ID)                             |
 | TELEGRAM_PROXY_URL                       | Run Telegram Bot over proxy                                                                                              |
 | JWT_ACCESS_TOKEN_EXPIRE_MINUTES          | Expire time for the Access Tokens in minutes, `0` considered as infinite (default: `1440`)                               |
@@ -296,11 +323,15 @@ By default the app will be run on `http://localhost:8000/dashboard`. You can con
 | NOTIFY_REACHED_USAGE_PERCENT             | At which percentage of usage to send the warning notification (default: `80`)                                            |
 | NOTIFY_DAYS_LEFT                         | When to send warning notifaction about expiration (default: `3`)                                                         |
 | USERS_AUTODELETE_DAYS                    | Delete expired (and optionally limited users) after this many days (Negative values disable this feature, default: `-1`) |
-| USER_AUTODELETE_INCLUDE_LIMITED_ACCOUNTS | Weather to include limited accounts in the auto-delete feature (default: `False`)                                        |
+| USER_AUTODELETE_INCLUDE_LIMITED_ACCOUNTS | Whether to include limited accounts in the auto-delete feature (default: `False`)                                        |
 | USE_CUSTOM_JSON_DEFAULT                  | Enable custom JSON config for ALL supported clients (default: `False`)                                                   |
 | USE_CUSTOM_JSON_FOR_V2RAYNG              | Enable custom JSON config only for V2rayNG (default: `False`)                                                            |
 | USE_CUSTOM_JSON_FOR_STREISAND            | Enable custom JSON config only for Streisand (default: `False`)                                                          |
 | USE_CUSTOM_JSON_FOR_V2RAYN               | Enable custom JSON config only for V2rayN (default: `False`)                                                             |
+
+# Documentation
+
+The [Marzban Documentation](https://gozargah.github.io/marzban) provides all the essential guides to get you started, available in three languages: Farsi, English, and Russian. This documentation requires significant effort to cover all aspects of the project comprehensively. We welcome and appreciate your contributions to help us improve it. You can contribute on this [GitHub repository](https://github.com/Gozargah/gozargah.github.io).
 
 # API
 
@@ -312,6 +343,26 @@ It's always a good idea to backup your Marzban files regularly to prevent data l
 
 1. By default, all Marzban important files are saved in `/var/lib/marzban` (Docker versions). Copy the entire `/var/lib/marzban` directory to a backup location of your choice, such as an external hard drive or cloud storage.
 2. Additionally, make sure to backup your env file, which contains your configuration variables, and also, your Xray config file. If you installed Marzban using marzban-scripts (recommended installation approach), the env and other configurations should be inside `/opt/marzban/` directory.
+
+Marzban's backup service efficiently zips all necessary files and sends them to your specified Telegram bot. It supports SQLite, MySQL, and MariaDB databases. One of its key features is automation, allowing you to schedule backups every hour. There are no limitations concerning Telegram's upload limits for bots; if a file exceeds the limit, it will be split and sent in multiple parts. Additionally, you can initiate an immediate backup at any time.
+
+Install the Latest Version of Marzban Command:
+
+```bash
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install-script
+```
+
+Setup the Backup Service:
+
+```bash
+marzban backup-service
+```
+
+Get an Immediate Backup:
+
+```bash
+marzban backup
+```
 
 By following these steps, you can ensure that you have a backup of all your Marzban files and data, as well as your configuration variables and Xray configuration, in case you need to restore them in the future. Remember to update your backups regularly to keep them up-to-date.
 
