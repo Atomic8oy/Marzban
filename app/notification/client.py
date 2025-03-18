@@ -24,42 +24,49 @@ async def send_discord_webhook(json_data, webhook):
         logger.debug("Discord webhook payload delivered successfully, code {}.".format(result.status_code))
 
 
-async def send_telegram_message(message, chat_id=None, channel_id=None, topic_id=None):
+async def send_telegram_message(message, chat_id=0, channel_id=0, topic_id=0):
     """
     Send a message to Telegram based on the available IDs.
-
     Args:
         message (str): The message to send
         chat_id (str, optional): The chat ID for direct messages
         channel_id (str, optional): The channel ID for channel messages
         topic_id (int, optional): The topic ID for forum topics in channels
-
     Returns:
-        dict: The response from the Telegram API
+        bool: True if message was sent successfully, False otherwise
     """
+    # Ensure TELEGRAM_API_TOKEN is available
+    try:
+        TELEGRAM_API_TOKEN
+    except NameError:
+        logger.error("TELEGRAM_API_TOKEN is not defined")
+        return
+
     base_url = f"https://api.telegram.org/bot{TELEGRAM_API_TOKEN}/sendMessage"
+    payload = {"parse_mode": "Markdown", "text": message}
 
-    # Case 1: If topic_id and channel_id are available, send to topic in channel
-    if topic_id is not None and channel_id is not None:
-        payload = {"chat_id": channel_id, "message_thread_id": topic_id, "parse_mode": "Markdown", "text": message}
-
-    # Case 2: If channel_id is available, send to channel
-    elif channel_id is not None:
-        payload = {"chat_id": channel_id, "parse_mode": "Markdown", "text": message}
-
-    # Case 3: If only chat_id is available, send to chat
-    elif chat_id is not None:
-        payload = {"chat_id": chat_id, "parse_mode": "Markdown", "text": message}
-
+    # Determine the target chat/channel/topic
+    if topic_id != 0 and channel_id != 0:
+        payload["chat_id"] = channel_id
+        payload["message_thread_id"] = topic_id
+    elif channel_id != 0:
+        payload["chat_id"] = channel_id
+    elif chat_id != 0:
+        payload["chat_id"] = chat_id
     else:
         logger.error("At least one of chat_id, channel_id must be provided")
-
-    # Send the message
-    response = await client.post(base_url, data=payload)
+        return
 
     try:
-        response.raise_for_status()
-    except httpx.HTTPStatusError | httpx.ConnectError as err:
-        logger.error("Telegram message failed:" + str(err))
-    else:
-        logger.debug("Telegram message payload delivered successfully, code {}.".format(response.status_code))
+        response = await client.post(base_url, data=payload)
+        if response.status_code == 200:
+            logger.debug(f"Telegram message sent successfully, code {response.status_code}.")
+            return
+        else:
+            # Correctly access the text property without parentheses
+            response_text = response.text
+            logger.error(f"Telegram message failed: {response.status_code} - {response_text}")
+            return
+    except Exception as err:
+        logger.error(f"Telegram message failed: {str(err)}")
+        return
