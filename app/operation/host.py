@@ -45,7 +45,7 @@ class HostOperator(BaseOperator):
 
         host = BaseHost.model_validate(db_host)
 
-        asyncio.create_task(notification.add_host(host, admin))
+        asyncio.create_task(notification.add_host(host, admin.username))
 
         hosts.update()
 
@@ -78,7 +78,7 @@ class HostOperator(BaseOperator):
 
         host = BaseHost.model_validate(db_host)
 
-        asyncio.create_task(notification.modify_host(host, admin))
+        asyncio.create_task(notification.modify_host(host, admin.username))
 
         hosts.update()
 
@@ -96,7 +96,7 @@ class HostOperator(BaseOperator):
 
         host = BaseHost.model_validate(db_host)
 
-        asyncio.create_task(notification.remove_host(host, admin))
+        asyncio.create_task(notification.remove_host(host, admin.username))
 
         hosts.update()
 
@@ -123,6 +123,6 @@ class HostOperator(BaseOperator):
 
         logger.info(f'Host\'s has been modified by admin "{admin.username}"')
 
-        asyncio.create_task(notification.update_hosts(admin))
+        asyncio.create_task(notification.update_hosts(admin.username))
 
         return get_hosts(db=db)
