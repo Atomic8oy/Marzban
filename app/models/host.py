@@ -196,7 +196,7 @@ class BaseHost(BaseModel):
     security: ProxyHostSecurity = ProxyHostSecurity.inbound_default
     alpn: ProxyHostALPN = ProxyHostALPN.none
     fingerprint: ProxyHostFingerprint = ProxyHostFingerprint.none
-    allowinsecure: bool = False
+    allowinsecure: bool | None = None
     is_disabled: bool = False
     http_headers: dict[str, str] | None = None
     transport_settings: TransportSettings | None = None
