@@ -1,13 +1,14 @@
 import httpx
 
 from app.utils.logger import get_logger
-from config import TELEGRAM_API_TOKEN
+from config import TELEGRAM_API_TOKEN, NOTIFICATION_PROXY_URL
 
 
 client = httpx.AsyncClient(
     http2=True,
     timeout=httpx.Timeout(10),
     limits=httpx.Limits(max_keepalive_connections=1),
+    proxy=NOTIFICATION_PROXY_URL,
 )
 
 logger = get_logger("Notification")
@@ -18,7 +19,7 @@ async def send_discord_webhook(json_data, webhook):
 
     try:
         result.raise_for_status()
-    except httpx.HTTPStatusError | httpx.ConnectError as err:
+    except Exception as err:
         logger.error("Discord webhook failed:" + str(err))
     else:
         logger.debug("Discord webhook payload delivered successfully, code {}.".format(result.status_code))
