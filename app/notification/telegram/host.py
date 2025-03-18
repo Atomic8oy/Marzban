@@ -44,7 +44,7 @@ async def remove_host(host: BaseHost, by: str):
         + f"_ID: {host.id}_\n"
         + f"_By: {by}_"
     )
-    if any([TELEGRAM_ADMIN_ID, TELEGRAM_LOGGER_CHANNEL_ID, TELEGRAM_LOGGER_TOPIC_ID]):
+    if TELEGRAM_NOTIFY:
         await send_telegram_message(data, TELEGRAM_ADMIN_ID, TELEGRAM_LOGGER_CHANNEL_ID, TELEGRAM_LOGGER_TOPIC_ID)
 
 
